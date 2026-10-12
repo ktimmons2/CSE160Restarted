@@ -27,7 +27,7 @@ implementation{
 
    seenPacket seenPackets[MAX_SEEN_PACKETS];
    uint8_t seenCount = 0;
-   
+
    bool isPacketSeen(uint16_t src, uint16_t seq){
       uint8_t i;
       for(i = 0; i < seenCount; i++){
@@ -97,14 +97,13 @@ implementation{
             return msg;
          }
 
-         // 2. Mark this packet as seen before rebroadcasting
-         markPacketSeen(myMsg->src, myMsg->seq);
-
-         // 3. Drop expired packets
+         // 2. Drop expired packets
          if(myMsg->TTL == 0){
             dbg(FLOODING_CHANNEL, "TTL expired; dropping packet\n");
             return msg;
          }
+         //3. Mark this packet as seen
+         markPacketSeen(myMsg->src, myMsg->seq);
 
          // 4. If this is for me, process it
          if(myMsg->dest == TOS_NODE_ID){
@@ -113,12 +112,13 @@ implementation{
             return msg;
          }
 
-         // 5. Otherwise, rebroadcast to neighbors
-         myMsg->TTL--;
-         dbg(FLOODING_CHANNEL, "Forwarding packet from %hu to broadcast\n", TOS_NODE_ID);
+         // 5. Otherwise, decrement the hop limit and rebroadcast a copy.
+         forwarded = *myMsg;
+         forwarded.TTL--;
+         dbg(FLOODING_CHANNEL, "Forwarding packet from %hu with ttl=%hhu\n", TOS_NODE_ID, forwarded.TTL);
 
          // Use broadcast for the flood step; this matches the assignment's "broadcast to all nodes"
-         call Sender.send(*myMsg, AM_BROADCAST_ADDR);
+         call Sender.send(forwarded, AM_BROADCAST_ADDR);
 
          return msg;
       }
@@ -136,7 +136,9 @@ implementation{
       dbg(FLOODING_CHANNEL, "Sending new flood packet seq=%hu from=%hu to=%hu ttl=%hu\n",
           pkt.seq, pkt.src, pkt.dest, pkt.TTL);
 
-      call Sender.send(pkt, destination);
+       // Mark the origin's packet so a copy returning through the network is dropped.
+      markPacketSeen(pkt.src, pkt.seq);
+      call Sender.send(pkt, AM_BROADCAST_ADDR);
    }
 
    event void CommandHandler.printNeighbors(){}
