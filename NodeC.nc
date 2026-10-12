@@ -20,17 +20,17 @@ implementation {
 
     Node -> MainC.Boot;
 
-    Node.Receive -> GeneralReceive;
+    components new SimpleSendC(AM_PACK) as Sender;
+    components FloodingC;
+    components NeighborDiscoveryC;
 
-    components ActiveMessageC;
-    Node.AMControl -> ActiveMessageC;
-
-    components new SimpleSendC(AM_PACK);
-    Node.Sender -> SimpleSendC;
+    FloodingC.Receive -> GeneralReceive;
+    FloodingC.Sender -> Sender;
+    NeighborDiscoveryC.Flooding -> FloodingC.Flooding;
+    NeighborDiscoveryC.Sender -> Sender;
+    Node.Flooding -> FloodingC.Flooding;
+    Node.NeighborDiscovery -> NeighborDiscoveryC;
 
     components CommandHandlerC;
     Node.CommandHandler -> CommandHandlerC;
-
-    components new TimerMilliC() as NeighborTimer;
-    Node.neighborTimer -> NeighborTimer;
 }
