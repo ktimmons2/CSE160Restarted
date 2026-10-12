@@ -87,6 +87,7 @@ implementation{
    event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len){
       if(len == sizeof(pack)){
          pack* myMsg = (pack*) payload;
+         pack forwarded;
 
          dbg(FLOODING_CHANNEL, "Received packet: src=%hu dest=%hu seq=%hu ttl=%hhu\n",
              myMsg->src, myMsg->dest, myMsg->seq, myMsg->TTL);
@@ -97,12 +98,13 @@ implementation{
             return msg;
          }
 
-         // 2. Drop expired packets
+         // 2. Drop expired packets before delivering or forwarding them.
          if(myMsg->TTL == 0){
             dbg(FLOODING_CHANNEL, "TTL expired; dropping packet\n");
             return msg;
          }
-         //3. Mark this packet as seen
+
+         // Remember valid packets before processing them so duplicates are ignored.
          markPacketSeen(myMsg->src, myMsg->seq);
 
          // 4. If this is for me, process it
@@ -114,8 +116,9 @@ implementation{
 
          // 5. Otherwise, decrement the hop limit and rebroadcast a copy.
          forwarded = *myMsg;
-         forwarded.TTL--;
-         dbg(FLOODING_CHANNEL, "Forwarding packet from %hu with ttl=%hhu\n", TOS_NODE_ID, forwarded.TTL);
+         forwarded.TTL = myMsg->TTL - 1;
+         dbg(FLOODING_CHANNEL, "Forwarding packet from %hu with ttl=%hhu\n",
+             TOS_NODE_ID, forwarded.TTL);
 
          // Use broadcast for the flood step; this matches the assignment's "broadcast to all nodes"
          call Sender.send(forwarded, AM_BROADCAST_ADDR);
@@ -136,7 +139,7 @@ implementation{
       dbg(FLOODING_CHANNEL, "Sending new flood packet seq=%hu from=%hu to=%hu ttl=%hu\n",
           pkt.seq, pkt.src, pkt.dest, pkt.TTL);
 
-       // Mark the origin's packet so a copy returning through the network is dropped.
+      // Mark the origin's packet so a copy returning through the network is dropped.
       markPacketSeen(pkt.src, pkt.seq);
       call Sender.send(pkt, AM_BROADCAST_ADDR);
    }
