@@ -137,4 +137,6 @@ implementation{
       }
       return rawMessage;
    }
+
+   event void Sender.sendDone(pack message, error_t error){}
 }

@@ -4,6 +4,7 @@
 
 #define MAX_NEIGHBORS 20
 #define NEIGHBOR_PROBE_INTERVAL 30000
+#define NEIGHBOR_PROBE_JITTER 5000
 #define MAX_MISSED_NEIGHBOR_PROBES 5
 
 typedef struct {
@@ -20,6 +21,7 @@ module NeighborDiscoveryP{
    uses interface Flooding;
    uses interface SimpleSend as Sender;
    uses interface Timer<TMilli> as probeTimer;
+   uses interface Random;
 }
 
 implementation{
@@ -75,6 +77,13 @@ implementation{
       neighbors[slot].info.quality = quality;
    }
 
+   void scheduleNextProbe(){
+      uint16_t delay = NEIGHBOR_PROBE_INTERVAL - NEIGHBOR_PROBE_JITTER +
+                      (call Random.rand16() %
+                       ((2 * NEIGHBOR_PROBE_JITTER) + 1));
+      call probeTimer.startOneShot(delay);
+   }
+
    command uint8_t NeighborDiscovery.getNeighborCount(){
       return neighborCount;
    }
@@ -93,7 +102,10 @@ implementation{
 
    event void AMControl.startDone(error_t error){
       if(error == SUCCESS){
-         call probeTimer.startPeriodic(NEIGHBOR_PROBE_INTERVAL);
+         uint16_t initialDelay = 1000 +
+                                 (call Random.rand16() %
+                                  (NEIGHBOR_PROBE_INTERVAL - 1000));
+         call probeTimer.startOneShot(initialDelay);
       }else{
          call AMControl.start();
       }
@@ -118,10 +130,28 @@ implementation{
       result = call Sender.send(probe, AM_BROADCAST_ADDR);
       if(result != SUCCESS){
          dbg(NEIGHBOR_CHANNEL, "Unable to queue neighbor probe seq=%hu\n", probe.seq);
+         scheduleNextProbe();
          return;
       }
 
-      currentProbeSeq = probe.seq;
+      dbg(NEIGHBOR_CHANNEL, "Queued neighbor probe seq=%hu\n", probe.seq);
+      scheduleNextProbe();
+   }
+
+   event void Sender.sendDone(pack message, error_t error){
+      uint8_t i;
+
+      if(message.protocol != PROTOCOL_NEIGHBOR_REQUEST ||
+         message.src != TOS_NODE_ID){
+         return;
+      }
+      if(error != SUCCESS){
+         dbg(NEIGHBOR_CHANNEL, "Neighbor probe transmission failed seq=%hu error=%hhu\n",
+             message.seq, error);
+         return;
+      }
+
+      currentProbeSeq = message.seq;
       hasCurrentProbe = TRUE;
       for(i = 0; i < neighborCount; i++){
          if(neighbors[i].probesSent < 65535){
@@ -135,7 +165,7 @@ implementation{
          }
          updateQuality(i);
       }
-      dbg(NEIGHBOR_CHANNEL, "Broadcasting neighbor probe seq=%hu\n", probe.seq);
+      dbg(NEIGHBOR_CHANNEL, "Neighbor probe transmitted seq=%hu\n", message.seq);
    }
 
    event void Flooding.receive(pack message){

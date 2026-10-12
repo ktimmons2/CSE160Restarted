@@ -30,6 +30,7 @@ implementation{
    uint16_t sequenceNum = 0;
    bool busy = FALSE;
    message_t pkt;
+   pack inFlightMessage;
 
    error_t send(uint16_t src, uint16_t dest, pack *message);
 
@@ -128,6 +129,7 @@ implementation{
          // Attempt to send the packet.
          if(call AMSend.send(dest, &pkt, sizeof(pack)) ==SUCCESS){
             // See AMSend.sendDone(msg, error) to see what happens after.
+            inFlightMessage = *message;
             busy = TRUE;
             return SUCCESS;
          }else{
@@ -151,6 +153,7 @@ implementation{
       //Clear Flag, we can send again.
       if(&pkt == msg){
          busy = FALSE;
+         signal SimpleSend.sendDone(inFlightMessage, error);
          postSendTask();
       }
    }
