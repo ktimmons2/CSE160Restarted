@@ -11,6 +11,8 @@ implementation{
    components new TimerMilliC() as ProbeTimer;
    components RandomC;
 
+   // Export the query interface and wire discovery to boot, radio control,
+   // timer/random services, flooding delivery, and the shared queued sender.
    NeighborDiscovery = DiscoveryLogic.NeighborDiscovery;
    DiscoveryLogic.Boot -> MainC.Boot;
    DiscoveryLogic.AMControl -> ActiveMessageC;

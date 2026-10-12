@@ -132,6 +132,9 @@ class TestSim:
 def main():
     s = TestSim();
     s.runTime(10);
+    # The line topology makes node 3 reachable from node 1 only through node 2,
+    # so the second ping demonstrates actual multi-hop flooding rather than a
+    # direct radio send.
     s.loadTopo("long_line.topo");
     s.loadNoise("no_noise.txt");
     s.bootAll();
@@ -141,10 +144,13 @@ def main():
     s.addChannel(s.NEIGHBOR_CHANNEL);
 
     s.runTime(20);
+    # First verify a direct ping/reply, then a multi-hop ping/reply.
     s.ping(1, 2, "Hello, World");
     s.runTime(10);
     s.ping(1, 3, "Hi!");
     s.runTime(20);
+    # This command prints node 1's discovered-neighbor table, including link
+    # quality and active state, on NEIGHBOR_CHANNEL.
     s.neighborDMP(1);
     s.runTime(1);
 
