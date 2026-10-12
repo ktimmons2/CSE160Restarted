@@ -17,6 +17,8 @@ implementation{
    }
 
    event void Flooding.receive(pack message){
+      // Flooding handles routing, duplicate suppression, and TTL. The app
+      // only defines what an endpoint does with a delivered ping or reply.
       if(message.protocol == PROTOCOL_PING){
          dbg(GENERAL_CHANNEL, "Ping delivered to node %u from node %hu: %s\n",
              TOS_NODE_ID, message.src, message.payload);
@@ -30,6 +32,8 @@ implementation{
 
    event void CommandHandler.ping(uint16_t destination, uint8_t *payload){
       dbg(GENERAL_CHANNEL, "PING EVENT\n");
+      // Both local commands and ping replies use the same flooding service,
+      // so replies can travel back over multiple hops as well.
       call Flooding.send(destination, PROTOCOL_PING, payload,
                          PACKET_MAX_PAYLOAD_SIZE);
    }
@@ -39,6 +43,8 @@ implementation{
       uint8_t count = call NeighborDiscovery.getNeighborCount();
       neighborInfo info;
 
+      // This is the visible text table used during a demo. Each row reports
+      // the public neighbor state maintained by NeighborDiscoveryP.
       for(i = 0; i < count; i++){
          if(call NeighborDiscovery.getNeighbor(i, &info)){
             dbg(NEIGHBOR_CHANNEL, "Neighbor %hu quality=%hhu%% active=%s\n",

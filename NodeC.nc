@@ -24,6 +24,8 @@ implementation {
     components FloodingC;
     components NeighborDiscoveryC;
 
+    // One AM receiver feeds flooding, and one queued sender is shared by both
+    // services so they coordinate access to the mote's single radio.
     FloodingC.Receive -> GeneralReceive;
     FloodingC.Sender -> Sender;
     NeighborDiscoveryC.Flooding -> FloodingC.Flooding;

@@ -30,6 +30,8 @@ implementation{
    uint16_t sequenceNum = 0;
    bool busy = FALSE;
    message_t pkt;
+   // Keep a value copy because the queued sendInfo is returned to the pool
+   // as soon as AMSend accepts the packet, before sendDone occurs.
    pack inFlightMessage;
 
    error_t send(uint16_t src, uint16_t dest, pack *message);
@@ -64,6 +66,8 @@ implementation{
          // This is a FIFO queue.
          call Queue.enqueue(input);
 
+         // At this point the packet is only queued. Radio completion is
+         // reported asynchronously through SimpleSend.sendDone.
          // Start a send task which will be delayed.
          postSendTask();
 
@@ -83,6 +87,9 @@ implementation{
          // can be made.
          info = call Queue.head();
 
+         // Leave the queue head in place if AMSend is busy/fails; it will be
+         // retried later. Once accepted, the buffer is safe to recycle because
+         // the in-flight packet has its own message_t storage and value copy.
          // Attempt to send it.
          if(SUCCESS == send(info->src,info->dest, &(info->packet))){
             //Release resources used if the attempt was successful
@@ -153,6 +160,8 @@ implementation{
       //Clear Flag, we can send again.
       if(&pkt == msg){
          busy = FALSE;
+         // Notify all clients with the packet whose radio operation just
+         // completed; neighbor discovery uses this to count actual probes.
          signal SimpleSend.sendDone(inFlightMessage, error);
          postSendTask();
       }
